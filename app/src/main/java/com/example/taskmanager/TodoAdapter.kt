@@ -210,7 +210,7 @@ class TodoAdapter(val todos: MutableList<Todo>, private val context: Context) :
         datePickerDialog.show()
     }
 
-    private fun saveTodos() {
+    public fun saveTodos() {
         (context as MainActivity).saveTodos()
     }
 

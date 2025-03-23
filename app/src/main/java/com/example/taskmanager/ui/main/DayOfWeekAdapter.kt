@@ -1,8 +1,6 @@
-
 package com.example.taskmanager
 
 import android.graphics.Color
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -21,11 +19,8 @@ class DayOfWeekAdapter(
     private var currentWeekStart: Date
 ) : RecyclerView.Adapter<DayOfWeekAdapter.DayOfWeekViewHolder>() {
 
-    private val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-
-    class DayOfWeekViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+    inner class DayOfWeekViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val tvDayOfWeek: TextView = itemView.findViewById(R.id.tvDayOfWeek)
-        val tvDate: TextView = itemView.findViewById(R.id.tvDate)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): DayOfWeekViewHolder {
@@ -36,30 +31,25 @@ class DayOfWeekAdapter(
     override fun onBindViewHolder(holder: DayOfWeekViewHolder, position: Int) {
         val dayOfWeek = daysOfWeek[position]
         holder.tvDayOfWeek.text = dayOfWeek
-        val calendar = Calendar.getInstance()
-        calendar.time = currentWeekStart
-        calendar.add(Calendar.DAY_OF_MONTH, position)
-        val date = calendar.time
-        holder.tvDate.text = dateFormat.format(date)
-        Log.d("onBindViewHolder", "date: $date")
-        Log.d("onBindViewHolder", "selectedDay: $selectedDay")
-        if (isWeeklyView) {
-            if (position == selectedDay) {
-                holder.tvDayOfWeek.setTextColor(Color.WHITE)
-                holder.tvDate.setTextColor(Color.WHITE)
-                holder.itemView.setBackgroundColor(Color.BLUE)
-            } else {
-                holder.tvDayOfWeek.setTextColor(Color.BLACK)
-                holder.tvDate.setTextColor(Color.BLACK)
-                holder.itemView.setBackgroundColor(Color.WHITE)
-            }
+
+        // Highlight the selected day
+        if (position == selectedDay) {
+            holder.tvDayOfWeek.setTextColor(Color.WHITE)
+            holder.itemView.setBackgroundColor(Color.BLUE) // Highlight color
         } else {
             holder.tvDayOfWeek.setTextColor(Color.BLACK)
-            holder.tvDate.setTextColor(Color.BLACK)
-            holder.itemView.setBackgroundColor(Color.WHITE)
+            holder.itemView.setBackgroundColor(Color.WHITE) // Default color
         }
+
+        // Handle day click
         holder.itemView.setOnClickListener {
+            val calendar = Calendar.getInstance()
+            calendar.time = currentWeekStart
+            calendar.add(Calendar.DAY_OF_YEAR, position)
+            val date = calendar.time
             onDayOfWeekClicked(date)
+            selectedDay = position
+            notifyDataSetChanged() // Refresh the adapter to update highlights
         }
     }
 
