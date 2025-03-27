@@ -13,9 +13,7 @@
 *   **Daily and Weekly View:** View your tasks by day or by week.
 *   **Calendar View:** Select a specific date to view tasks for that day.
 
-## Screenshots
 
-![Screenshot 1](screenshots/screenshot1.png)
 
 ## Technologies Used
 
@@ -26,4 +24,6 @@
     *   **RecyclerView:** For efficient display of lists of tasks.
 *   **Git:** For version control.
 * **Room**: For persistent storage.
+
+**Under development**
 
