@@ -1,39 +1,57 @@
 package com.example.taskmanager
 
 import java.io.Serializable
+import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 
 data class Todo(
-    val title: String,
+    var title: String,
     var isChecked: Boolean = false,
-    var date: Date? = null,
-    var deadline: Date? = null,
+    var from: String? = null,          // Format: "HH:mm" (e.g., "14:30")
+    var to: String? = null,            // Format: "HH:mm" (e.g., "15:30")
     var isImportant: Boolean = false,
-    var isUrgent: Boolean = false
+    var isUrgent: Boolean = false,
+    var deadlineDate: String? = null,  // Format: "dd/MM/yyyy" (e.g., "25/12/2023")
+    var deadlineTime: String? = null,  // Format: "HH:mm" (e.g., "23:59")
+    var reminders: MutableList<String> = mutableListOf(), // Not currently used in notification logic
+    var day: Boolean = false,          // For daily repeating tasks
+    var week: Boolean = false,         // For weekly repeating tasks
+    var month: Boolean = false,        // For monthly repeating tasks
+    var date: Date? = null,            // The base date for the task
+    var reminderTimeDate: String? = null, // Format: "dd/MM/yyyy" (specific reminder date)
+    var reminderTimeTime: String? = null  // Format: "HH:mm" (specific reminder time)
 ) : Serializable {
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
 
-        other as Todo
-
-        if (title != other.title) return false
-        if (isChecked != other.isChecked) return false
-        if (date != other.date) return false
-        if (deadline != other.deadline) return false
-        if (isImportant != other.isImportant) return false
-        if (isUrgent != other.isUrgent) return false
-
-        return true
+    // Helper function to check if this todo has a reminder set
+    fun hasReminder(): Boolean {
+        return !reminderTimeDate.isNullOrEmpty() && !reminderTimeTime.isNullOrEmpty()
     }
 
-    override fun hashCode(): Int {
-        var result = title.hashCode()
-        result = 31 * result + isChecked.hashCode()
-        result = 31 * result + (date?.hashCode() ?: 0)
-        result = 31 * result + (deadline?.hashCode() ?: 0)
-        result = 31 * result + isImportant.hashCode()
-        result = 31 * result + isUrgent.hashCode()
-        return result
+    // Helper function to check if this todo has a deadline set
+    fun hasDeadline(): Boolean {
+        return !deadlineDate.isNullOrEmpty() && !deadlineTime.isNullOrEmpty()
+    }
+
+    // Helper function to check if this todo has a time range set
+    fun hasTimeRange(): Boolean {
+        return !from.isNullOrEmpty() && !to.isNullOrEmpty()
+    }
+
+    // Returns a string representation of the reminder time
+    fun getReminderTimeString(): String {
+        return if (hasReminder()) {
+            "$reminderTimeDate $reminderTimeTime"
+        } else if (hasDeadline()) {
+            "$deadlineDate $deadlineTime"
+        } else if (!from.isNullOrEmpty()) {
+            "${dateFormat.format(date ?: Date())} $from"
+        } else {
+            "No reminder set"
+        }
+    }
+
+    companion object {
+        private val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
     }
 }
