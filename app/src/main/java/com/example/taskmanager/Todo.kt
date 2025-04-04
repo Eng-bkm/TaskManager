@@ -1,39 +1,74 @@
 package com.example.taskmanager
 
 import java.io.Serializable
+import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 
 data class Todo(
-    val title: String,
+    var title: String,
     var isChecked: Boolean = false,
-    var date: Date? = null,
-    var deadline: Date? = null,
+    var from: String? = null,
+    var to: String? = null,
     var isImportant: Boolean = false,
-    var isUrgent: Boolean = false
+    var isUrgent: Boolean = false,
+    var deadlineDate: String? = null,
+    var deadlineTime: String? = null,
+    var reminders: MutableList<String> = mutableListOf(),
+    var day: Boolean = false,
+    var week: Boolean = false,
+    var month: Boolean = false,
+    var date: Date? = null,
+    var reminderTimeDate: String? = null,
+    var reminderTimeTime: String? = null
 ) : Serializable {
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
 
-        other as Todo
-
-        if (title != other.title) return false
-        if (isChecked != other.isChecked) return false
-        if (date != other.date) return false
-        if (deadline != other.deadline) return false
-        if (isImportant != other.isImportant) return false
-        if (isUrgent != other.isUrgent) return false
-
-        return true
+    fun hasReminder(): Boolean {
+        return !reminderTimeDate.isNullOrEmpty() && !reminderTimeTime.isNullOrEmpty()
     }
 
-    override fun hashCode(): Int {
-        var result = title.hashCode()
-        result = 31 * result + isChecked.hashCode()
-        result = 31 * result + (date?.hashCode() ?: 0)
-        result = 31 * result + (deadline?.hashCode() ?: 0)
-        result = 31 * result + isImportant.hashCode()
-        result = 31 * result + isUrgent.hashCode()
-        return result
+    fun hasDeadline(): Boolean {
+        return !deadlineDate.isNullOrEmpty() && !deadlineTime.isNullOrEmpty()
+    }
+
+    fun hasTimeRange(): Boolean {
+        return !from.isNullOrEmpty() && !to.isNullOrEmpty()
+    }
+
+    fun getReminderTimeString(): String {
+        return if (hasReminder()) {
+            "$reminderTimeDate $reminderTimeTime"
+        } else if (hasDeadline()) {
+            "$deadlineDate $deadlineTime"
+        } else if (!from.isNullOrEmpty()) {
+            "${dateFormat.format(date ?: Date())} $from"
+        } else {
+            "No reminder set"
+        }
+    }
+
+    // Deep copy method
+    fun deepCopy(): Todo {
+        return Todo(
+            title = this.title,
+            isChecked = this.isChecked,
+            from = this.from,
+            to = this.to,
+            isImportant = this.isImportant,
+            isUrgent = this.isUrgent,
+            deadlineDate = this.deadlineDate,
+            deadlineTime = this.deadlineTime,
+            reminders = this.reminders.toMutableList(),
+            day = this.day,
+            week = this.week,
+            month = this.month,
+            date = this.date?.let { Date(it.time) },
+            reminderTimeDate = this.reminderTimeDate,
+            reminderTimeTime = this.reminderTimeTime
+        )
+    }
+
+    companion object {
+        private val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
     }
 }

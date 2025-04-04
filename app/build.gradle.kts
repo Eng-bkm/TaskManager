@@ -14,7 +14,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.taskmanager"
+        applicationId = "com.example.mytasker"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
@@ -23,7 +23,9 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures {
-        viewBinding = true
+        viewBinding =  true
+        dataBinding = true
+
     }
 
     buildTypes {

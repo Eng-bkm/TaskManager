@@ -1,29 +1,88 @@
-# TaskManager - Your Personal To-Do List and Task Organizer
+# MyTasker - Minimalist Task Manager 📝
 
 
-**TaskManager** is a simple  Android application designed to help you manage your daily tasks and to-dos efficiently. With TaskManager, you can easily create, organize, prioritize, and track your tasks, ensuring you stay on top of your responsibilities.
+## Why MyTasker Exists
 
-## Features
+I created this app for personal use after failing to find a lightweight, non-complex task manager. As a good friend wisely observed:
 
-*   **Add Tasks:** Quickly add new tasks with titles.
-*   **Set Deadlines:** Assign deadlines to your tasks to keep track of important dates.
-*   **Mark as Done:** Check off tasks as you complete them.
-*   **Delete Completed Tasks:** Easily remove completed tasks with a single click.
-*   **Prioritize Tasks:** Mark tasks as important or urgent.
-*   **Daily and Weekly View:** View your tasks by day or by week.
-*   **Calendar View:** Select a specific date to view tasks for that day.
+> "Most task management tools miss the core purpose - they end up wasting your time instead of saving it."
 
 
 
-## Technologies Used
+MyTasker cuts through the clutter:
+- Insert tasks in seconds
+- Mark importance with one tap
+- Edit details later *only if needed*
+- Get intelligent notifications
 
-*   **Kotlin:** The primary programming language for Android development.
-*   **Android SDK:** The official software development kit for Android.
-*   **Android Jetpack:** A suite of libraries to help developers follow best practices, reduce boilerplate code, and write code that works consistently across Android versions.
-    *   **View Binding:** For easy and safe interaction with views.
-    *   **RecyclerView:** For efficient display of lists of tasks.
-*   **Git:** For version control.
-* **Room**: For persistent storage.
+![Main Screen](screenshots/lists.jpg)
 
-**Under development**
+
+
+## Key Features ⚡
+
+### Dead-Simple Workflow
+ **Add task (title only required)**
+
+![Main Screen](screenshots/adding.jpg)
+
+
+
+
+**daily, weekly, monthly repeated tasks marking**
+
+![Main Screen](screenshots/everyday.jpg)
+
+
+### Smart Notifications 🔔
+- Reminder alerts
+- Deadline warnings
+- 8-minute pre-task alerts *(configurable)*
+
+### Flexible Organization
+- Filter important/urgent tasks
+- Sort by:
+    - Creation time (default)
+    - Deadline
+    - Reminder time
+    - Custom priorities
+
+## Technical Notes ⚙️
+
+### Built With
+- Kotlin (My first Kotlin project!)
+- Android Jetpack Components
+- Material Design 3
+
+### Design Philosophy
+- **Minimalist UI**: No unnecessary clicks
+- **Zero Optimizations**: Intentional choice - the app is designed for sub-1-minute interactions
+- **Personal First**: Built exactly how *I* work
+
+## Getting Started
+
+### Installation
+1. Clone repository
+2. Open in Android Studio
+3. Build & run on device/emulator
+
+
+
+## Why You Might Like This
+✔️ No feature bloat  
+✔️ No mandatory fields  
+✔️ No cognitive load  
+✔️ Gets out of your way
+
+## Disclaimer
+This app was created to solve *my specific workflow needs*. The notification logic isn't exhaustive, but it works perfectly for how I use it. Feel free to fork and adapt it to your own rhythm!
+
+
+---
+
+*"If productivity apps demand more attention than your actual work, they've failed."*
+- MyTasker Philosophy
+=======
+
+
 

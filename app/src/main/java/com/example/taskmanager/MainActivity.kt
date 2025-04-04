@@ -1,14 +1,28 @@
 package com.example.taskmanager
 
+import android.Manifest
+import android.app.AlarmManager
 import android.app.DatePickerDialog
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.View
+import android.widget.PopupMenu
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.util.remove
-import androidx.core.util.size
+import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.taskmanager.databinding.ActivityMainBinding
-import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.ObjectInputStream
@@ -18,44 +32,46 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-/**
- * The MainActivity class is the main entry point for the application.
- * It manages the UI for displaying a list of TODO items, handling user interactions,
- * and persisting TODO data to a file.
- * <p>
- * This class implements the following functionalities:
- * 1. Displaying a list of TODO items for a selected date.
- * 2. Allowing users to add new TODO items.
- * 3. Deleting completed TODO items.
- * 4. Displaying a horizontal list of days of the week for navigation.
- * 5. Selecting a specific date via a date picker dialog.
- * 6. Persisting TODO items to a file (`todos.dat`).
- * 7. Loading TODO items from the file on application startup.
- * 8. Managing weekly view and daily view.
- * </p>
- */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var todoAdapter: TodoAdapter
     private lateinit var dayOfWeekAdapter: DayOfWeekAdapter
     private val todoFile = "todos.dat"
-    private val todosByDate = mutableMapOf<Date, MutableList<Todo>>()
-    private var selectedDate: Date? = null
+    private val todosByDate = mutableMapOf<String, MutableList<Todo>>()
+    private var selectedDate: Date = Date()
     private val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
     private var isWeeklyView = true
-    private var currentWeekStart: Date = Date()
+    private var currentWeekStart: Date = getStartOfWeek(Date())
+    private val CHANNEL_ID = "todo_reminder_channel"
+    private val NOTIFICATION_PERMISSION_REQUEST_CODE = 1001
+    private val EXACT_ALARM_PERMISSION_REQUEST_CODE = 1002
+
+    // Filter states
+    private var isShowingImportant = false
+    private var isShowingUrgent = false
+    private val originalTodoList = mutableListOf<Todo>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        Log.d("MainActivity", "currentWeekStart: $currentWeekStart")
+
+        checkNotificationPermission()
+        checkExactAlarmPermission()
+        createNotificationChannel()
+
+        // Initialize days of the week
         val daysOfWeek = getDaysOfWeek()
-        Log.d("MainActivity", "daysOfWeek: $daysOfWeek")
-        dayOfWeekAdapter = DayOfWeekAdapter(daysOfWeek, { date ->
-            onDayOfWeekClicked(date)
-        }, getDayOfWeek(Date()), true, currentWeekStart)
+        selectedDate = getStartOfDay(Date())
+
+        dayOfWeekAdapter = DayOfWeekAdapter(
+            daysOfWeek,
+            { date -> onDayOfWeekClicked(date) },
+            getSelectedDayOfWeek(selectedDate),
+            true,
+            currentWeekStart
+        )
 
         binding.rvDaysOfWeek.apply {
             adapter = dayOfWeekAdapter
@@ -63,35 +79,352 @@ class MainActivity : AppCompatActivity() {
         }
 
         loadTodos()
-        selectedDate = normalizeDate(Date()) // Normalize selectedDate immediately
-        Log.d("onCreate", "Initial selectedDate: $selectedDate")
-        todoAdapter = TodoAdapter(getTodosForDate(selectedDate ?: Date()))
+
+        todoAdapter = TodoAdapter(
+            getTodosForDate(selectedDate).toMutableList(),
+            this,
+            { updatedTodo -> handleTodoUpdate(updatedTodo) },
+            { position -> handleTodoDelete(position) }
+        )
 
         binding.rvTodoItems.apply {
             adapter = todoAdapter
             layoutManager = LinearLayoutManager(this@MainActivity)
         }
+
         updateTodoListForSelectedDate()
-        Log.d("onCreate", "updateTodoListForSelectedDate called after loadTodos")
 
+        // Set up button click listeners
         binding.btnAddTodo.setOnClickListener {
-            Log.d("btnAddTodo", "btnAddTodo clicked")
-            val todoTitle = binding.etTodoTitle.text.toString()
-            if (todoTitle.isNotEmpty() && selectedDate != null) {
-                Log.d("brook", "selectedDate: $selectedDate")
-                val todo = Todo(todoTitle, date = selectedDate)
-                addTodo(todo)
-                binding.etTodoTitle.text.clear()
-            }
+            addNewTodo()
         }
-
 
         binding.btnDeleteDoneTodos.setOnClickListener {
             deleteDoneTodos()
         }
 
-        binding.tvCalendar.setOnClickListener {
+        binding.btnDeleteRepeated.setOnClickListener {
+            deleteRepeatedTodos()
+        }
+
+        binding.btnCalendar.setOnClickListener {
             showDatePickerDialog()
+        }
+
+        // Set up menu button click listener
+        binding.btnMenu.setOnClickListener { view ->
+            showFilterMenu(view)
+        }
+
+        rescheduleAllNotifications()
+    }
+
+    private fun addNewTodo() {
+        val todoTitle = binding.etTodoTitle.text.toString()
+        if (todoTitle.isNotEmpty()) {
+            val todo = Todo(todoTitle, date = selectedDate)
+            addTodo(todo)
+            binding.etTodoTitle.text.clear()
+        } else {
+            Toast.makeText(this, "Please enter a task title", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun showFilterMenu(anchorView: View) {
+        val popup = PopupMenu(this, anchorView)
+        popup.menuInflater.inflate(R.menu.filter_menu, popup.menu)
+
+        popup.menu.findItem(R.id.menu_important)?.isChecked = isShowingImportant
+        popup.menu.findItem(R.id.menu_urgent)?.isChecked = isShowingUrgent
+
+        popup.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                R.id.menu_important -> {
+                    isShowingImportant = !isShowingImportant
+                    if (isShowingImportant) isShowingUrgent = false
+                    applyFilters()
+                    true
+                }
+                R.id.menu_urgent -> {
+                    isShowingUrgent = !isShowingUrgent
+                    if (isShowingUrgent) isShowingImportant = false
+                    applyFilters()
+                    true
+                }
+                R.id.menu_clear -> {
+                    isShowingImportant = false
+                    isShowingUrgent = false
+                    applyFilters()
+                    true
+                }
+                else -> false
+            }
+        }
+
+        popup.show()
+    }
+
+    private fun applyFilters() {
+        val filteredList = when {
+            isShowingImportant -> originalTodoList.filter { it.isImportant }
+            isShowingUrgent -> originalTodoList.filter { it.isUrgent }
+            else -> originalTodoList.toList()
+        }.sortedBy { it.date }
+
+        todoAdapter.updateTodos(filteredList)
+    }
+
+    private fun checkNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            when {
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED -> {
+                    // Permission already granted
+                }
+                ActivityCompat.shouldShowRequestPermissionRationale(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) -> {
+                    showPermissionExplanationDialog()
+                }
+                else -> {
+                    ActivityCompat.requestPermissions(
+                        this,
+                        arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                        NOTIFICATION_PERMISSION_REQUEST_CODE
+                    )
+                }
+            }
+        }
+    }
+
+    private fun checkExactAlarmPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
+            if (!alarmManager.canScheduleExactAlarms()) {
+                val intent = Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                try {
+                    startActivityForResult(intent, EXACT_ALARM_PERMISSION_REQUEST_CODE)
+                } catch (e: Exception) {
+                    Toast.makeText(
+                        this,
+                        "Please enable exact alarms in settings",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
+    private fun showPermissionExplanationDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Notification Permission Needed")
+            .setMessage("This app needs notification permission to remind you about your tasks.")
+            .setPositiveButton("OK") { _, _ ->
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    NOTIFICATION_PERMISSION_REQUEST_CODE
+                )
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Todo Reminders",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Channel for todo task reminders"
+                enableVibration(true)
+            }
+
+            val notificationManager = getSystemService(NotificationManager::class.java)
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    fun scheduleTodoNotification(todo: Todo) {
+        try {
+            if (todo.hasReminder()) {
+                val reminderDateTime = "${todo.reminderTimeDate} ${todo.reminderTimeTime}"
+                val time = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+                    .parse(reminderDateTime)?.time ?: 0L
+
+                if (time > System.currentTimeMillis()) {
+                    scheduleNotification(todo, time, true)
+                }
+            } else if (todo.hasDeadline()) {
+                val deadlineDateTime = "${todo.deadlineDate} ${todo.deadlineTime}"
+                val time = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+                    .parse(deadlineDateTime)?.time ?: 0L
+
+                if (time > System.currentTimeMillis()) {
+                    scheduleNotification(todo, time, false)
+                }
+            } else if (!todo.from.isNullOrEmpty()) {
+                val todoDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                    .format(todo.date ?: Date())
+                val fromDateTime = "$todoDate ${todo.from}"
+                val calendar = Calendar.getInstance().apply {
+                    time = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+                        .parse(fromDateTime) ?: Date()
+                    add(Calendar.MINUTE, -5)
+                }
+                scheduleNotification(todo, calendar.timeInMillis, false)
+            }
+        } catch (e: Exception) {
+            Log.e("Notification", "Error scheduling notification for task: ${todo.title}", e)
+            Toast.makeText(this, "Error scheduling notification", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun scheduleNotification(todo: Todo, triggerTime: Long, isReminder: Boolean) {
+        val notificationId = todo.hashCode()
+        val intent = Intent(this, ReminderReceiver::class.java).apply {
+            putExtra("notification_id", notificationId)
+            putExtra("title", todo.title)
+            putExtra("content", buildNotificationContent(todo, isReminder))
+        }
+
+        val pendingIntent = PendingIntent.getBroadcast(
+            this,
+            notificationId,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                triggerTime,
+                pendingIntent
+            )
+        } else {
+            alarmManager.setExact(
+                AlarmManager.RTC_WAKEUP,
+                triggerTime,
+                pendingIntent
+            )
+        }
+    }
+
+    private fun buildNotificationContent(todo: Todo, isReminder: Boolean): String {
+        return when {
+            isReminder -> "Reminder: ${todo.title}"
+            todo.hasDeadline() -> "Deadline: ${todo.deadlineDate} ${todo.deadlineTime}"
+            !todo.from.isNullOrEmpty() -> "Starting soon at ${todo.from}"
+            else -> "Task reminder"
+        }
+    }
+
+    private fun rescheduleAllNotifications() {
+        todosByDate.values.flatten().forEach { todo ->
+            scheduleTodoNotification(todo)
+        }
+    }
+
+    public fun addTodo(todo: Todo) {
+        val dateString = dateFormat.format(todo.date ?: Date())
+        val existingTodos = todosByDate.getOrPut(dateString) { mutableListOf() }
+
+        val duplicateTodo = existingTodos.find { it.title == todo.title }
+        if (duplicateTodo != null) {
+            existingTodos.remove(duplicateTodo)
+            originalTodoList.remove(duplicateTodo)
+        }
+
+        existingTodos.add(todo)
+        todosByDate[dateString] = existingTodos
+        originalTodoList.add(todo)
+
+        scheduleTodoNotification(todo)
+        updateTodoListForSelectedDate()
+        saveTodos()
+    }
+
+    private fun deleteDoneTodos() {
+        try {
+            val currentDateKey = dateFormat.format(selectedDate)
+            val currentDateTodos = todosByDate[currentDateKey] ?: mutableListOf()
+            val todosToRemove = currentDateTodos.filter { it.isChecked }.toList()
+
+            currentDateTodos.removeAll(todosToRemove)
+            originalTodoList.removeAll(todosToRemove)
+
+            if (currentDateTodos.isEmpty()) {
+                todosByDate.remove(currentDateKey)
+            } else {
+                todosByDate[currentDateKey] = currentDateTodos
+            }
+
+            updateTodoListForSelectedDate()
+            saveTodos()
+
+            Toast.makeText(
+                this,
+                "Deleted ${todosToRemove.size} completed tasks",
+                Toast.LENGTH_SHORT
+            ).show()
+
+        } catch (e: Exception) {
+            Log.e("DeleteDoneTodos", "Error deleting todos", e)
+            Toast.makeText(this, "Error deleting tasks", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun deleteRepeatedTodos() {
+        try {
+            val currentDate = selectedDate
+            val calendar = Calendar.getInstance().apply { time = currentDate }
+            val currentDateKey = dateFormat.format(currentDate)
+            val currentTodos = todosByDate[currentDateKey] ?: mutableListOf()
+            val checkedTodos = currentTodos.filter { it.isChecked }
+
+            if (checkedTodos.isEmpty()) {
+                Toast.makeText(this, "No checked tasks to delete", Toast.LENGTH_SHORT).show()
+                return
+            }
+
+            var totalDeleted = 0
+
+            for (dayOffset in 0..100) {
+                calendar.time = currentDate
+                calendar.add(Calendar.DAY_OF_YEAR, dayOffset)
+                val futureDateKey = dateFormat.format(calendar.time)
+
+                todosByDate[futureDateKey]?.let { todos ->
+                    val beforeCount = todos.size
+                    checkedTodos.forEach { checkedTodo ->
+                        todos.removeAll { it.title == checkedTodo.title }
+                    }
+                    totalDeleted += (beforeCount - todos.size)
+
+                    if (todos.isEmpty()) {
+                        todosByDate.remove(futureDateKey)
+                    }
+                }
+            }
+
+            originalTodoList.removeAll(checkedTodos)
+            updateTodoListForSelectedDate()
+            saveTodos()
+
+            Toast.makeText(
+                this,
+                "Deleted $totalDeleted tasks across 100 days",
+                Toast.LENGTH_SHORT
+            ).show()
+
+        } catch (e: Exception) {
+            Log.e("DeleteChecked", "Error deleting todos", e)
+            Toast.makeText(this, "Failed to delete tasks", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -99,11 +432,60 @@ class MainActivity : AppCompatActivity() {
         val daysOfWeek = mutableListOf<String>()
         val calendar = Calendar.getInstance()
         calendar.time = currentWeekStart
+
+        val dateFormat = SimpleDateFormat("EEEE", Locale.getDefault())
         for (i in 0 until 7) {
-            daysOfWeek.add(calendar.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.SHORT, Locale.getDefault()) ?: "")
-            calendar.add(Calendar.DAY_OF_MONTH, 1)
+            daysOfWeek.add(dateFormat.format(calendar.time))
+            calendar.add(Calendar.DAY_OF_YEAR, 1)
         }
+
         return daysOfWeek
+    }
+
+    private fun onDayOfWeekClicked(date: Date) {
+        selectedDate = getStartOfDay(date)
+        dayOfWeekAdapter.setSelectedDay(getSelectedDayOfWeek(selectedDate))
+        updateTodoListForSelectedDate()
+    }
+
+    private fun updateTodoListForSelectedDate() {
+        val todos = getTodosForDate(selectedDate)
+        todoAdapter.updateTodos(todos)
+    }
+
+    private fun getSelectedDayOfWeek(date: Date): Int {
+        val calendar = Calendar.getInstance()
+        calendar.time = date
+        calendar.firstDayOfWeek = Calendar.MONDAY
+        val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK) - calendar.firstDayOfWeek
+        return if (dayOfWeek < 0) 6 else dayOfWeek
+    }
+
+    private fun getStartOfWeek(date: Date): Date {
+        val calendar = Calendar.getInstance()
+        calendar.time = date
+        calendar.firstDayOfWeek = Calendar.MONDAY
+        calendar.set(Calendar.DAY_OF_WEEK, calendar.firstDayOfWeek)
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        return calendar.time
+    }
+
+    private fun getStartOfDay(date: Date): Date {
+        val calendar = Calendar.getInstance()
+        calendar.time = date
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        return calendar.time
+    }
+
+    private fun getTodosForDate(date: Date): List<Todo> {
+        val dateString = dateFormat.format(date)
+        return todosByDate[dateString]?.toList() ?: emptyList()
     }
 
     private fun showDatePickerDialog() {
@@ -117,10 +499,12 @@ class MainActivity : AppCompatActivity() {
             { _, selectedYear, selectedMonth, selectedDay ->
                 val selectedCalendar = Calendar.getInstance()
                 selectedCalendar.set(selectedYear, selectedMonth, selectedDay)
-                selectedDate = selectedCalendar.time
+                val selectedDate = getStartOfDay(selectedCalendar.time)
+                this.selectedDate = selectedDate
                 isWeeklyView = false
                 updateTodoListForSelectedDate()
                 dayOfWeekAdapter.setWeeklyView(false)
+                dayOfWeekAdapter.setSelectedDay(getSelectedDayOfWeek(selectedDate))
             },
             year,
             month,
@@ -129,104 +513,13 @@ class MainActivity : AppCompatActivity() {
         datePickerDialog.show()
     }
 
-    private fun updateTodoListForSelectedDate() {
-        Log.d("updateTodoListForSelectedDate", "updateTodoListForSelectedDate called")
-        val currentTodos = getTodosForDate(selectedDate ?: Date())
-        todoAdapter.todos.clear()
-        todoAdapter.todos.addAll(currentTodos)
-        todoAdapter.notifyDataSetChanged()
-        Log.d("updateTodoListForSelectedDate", "todosByDate size after update: ${todosByDate.size}")
-    }
-
-
-    private fun onDayOfWeekClicked(date: Date) {
-        Log.d("onDayOfWeekClicked", "Clicked date: $date")
-        Log.d("onDayOfWeekClicked", "getDayOfWeek(date): ${getDayOfWeek(date)}")
-        isWeeklyView = true
-        selectedDate = date
-        if (getDayOfWeek(date) == getDayOfWeek(Date())) {
-            selectedDate = normalizeDate(Date())
-        }
-        updateTodoListForSelectedDate()
-        dayOfWeekAdapter.setWeeklyView(true)
-        dayOfWeekAdapter.setSelectedDay(getDayOfWeek(date))
-
-
-    }
-
-    private fun onDeadlineSet(position: Int, date: Date?) {
-        if (position >= 0 && position < todoAdapter.todos.size) {
-            todoAdapter.todos[position].deadline = date
-            todoAdapter.todos.sortBy { it.deadline }
-            todoAdapter.notifyDataSetChanged()
-            saveTodos()
-        }
-    }
-
-    private fun addTodo(todo: Todo) {
-        Log.d("addTodo", "--------------------------------------------------")
-        Log.d("addTodo", "addTodo called")
-        Log.d("addTodo", "Todo to add: ${todo.title}, date: ${todo.date}")
-        Log.d("addTodo", "todosByDate before adding: $todosByDate")
-        val todoDate = todo.date ?: return
-        Log.d("addTodo", "todoDate before normalization: $todoDate")
-        val normalizedTodoDate = normalizeDate(todoDate)
-        Log.d("addTodo", "todoDate after normalization: $normalizedTodoDate")
-        val currentDayTodos = todosByDate.getOrPut(normalizedTodoDate) {
-            Log.d("addTodo", "Creating new list for date: $normalizedTodoDate")
-            mutableListOf()
-        }
-        Log.d("addTodo", "currentDayTodos size before adding: ${currentDayTodos.size}")
-        // Check if the todo is already in the list before adding
-        if (!currentDayTodos.any { it.title == todo.title && it.date == todo.date }) {
-            currentDayTodos.add(todo)
-            Log.d("addTodo", "Todo added: ${todo.title}")
-        } else {
-            Log.d("addTodo", "Todo already exists: ${todo.title}")
-        }
-        Log.d("addTodo", "currentDayTodos size after adding: ${currentDayTodos.size}")
-        Log.d("addTodo", "todosByDate size after adding: ${todosByDate.size}")
-        Log.d("addTodo", "todosByDate after adding: $todosByDate")
-        // Instead of adding directly, refresh the list properly
-        updateTodoListForSelectedDate()
-        Log.d("addTodo", "Calling saveTodos() after adding a todo")
-        saveTodos()
-        Log.d("addTodo", "--------------------------------------------------")
-    }
-
-    private fun deleteDoneTodos() {
-        val currentTodos = getTodosForDate(selectedDate ?: Date())
-        val iterator = currentTodos.iterator()
-        while (iterator.hasNext()) {
-            val todo = iterator.next()
-            if (todo.isChecked) {
-                iterator.remove()
-            }
-        }
-        todoAdapter.notifyDataSetChanged()
-        saveTodos()
-    }
-
-    private fun saveTodos() {
+    public fun saveTodos() {
         try {
-            Log.d("SaveTodos", "--------------------------------------------------")
-            Log.d("SaveTodos", "saveTodos called")
-            Log.d("SaveTodos", "todosByDate before saving: $todosByDate")
-            Log.d("SaveTodos", "todosByDate size before saving: ${todosByDate.size}")
-            for ((date, todos) in todosByDate) {
-                Log.d("SaveTodos", "  Date: $date")
-                for (todo in todos) {
-                    Log.d("SaveTodos", "    - ${todo.title}, isChecked: ${todo.isChecked}, deadline: ${todo.deadline}, isImportant: ${todo.isImportant}, isUrgent: ${todo.isUrgent}")
-                }
-            }
-            val file = File(filesDir, todoFile)
-            Log.d("SaveTodos", "Saving to: ${file.absolutePath}")
-            val fos = FileOutputStream(file)
-            val oos = ObjectOutputStream(fos)
-            oos.writeObject(todosByDate)
-            oos.close()
-            Log.d("SaveTodos", "saveTodos finished")
-            Log.d("SaveTodos", "--------------------------------------------------")
+            val fileOutputStream: FileOutputStream = openFileOutput(todoFile, Context.MODE_PRIVATE)
+            val objectOutputStream = ObjectOutputStream(fileOutputStream)
+            objectOutputStream.writeObject(todosByDate)
+            objectOutputStream.close()
+            fileOutputStream.close()
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -234,68 +527,163 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadTodos() {
         try {
-            Log.d("LoadTodos", "--------------------------------------------------")
-            Log.d("LoadTodos", "loadTodos called")
-            val file = File(filesDir, todoFile)
-            Log.d("LoadTodos", "Loading from: ${file.absolutePath}")
-            if (!file.exists()) {
-                Log.d("LoadTodos", "todos.dat file does not exist.")
-                Log.d("LoadTodos", "--------------------------------------------------")
-                return
+            val fileInputStream: FileInputStream = openFileInput(todoFile)
+            val objectInputStream = ObjectInputStream(fileInputStream)
+            val loadedTodos =
+                objectInputStream.readObject() as? MutableMap<String, MutableList<Todo>>
+            if (loadedTodos != null) {
+                todosByDate.clear()
+                todosByDate.putAll(loadedTodos)
+                originalTodoList.clear()
+                originalTodoList.addAll(todosByDate.values.flatten())
             }
-            val fis = FileInputStream(file)
-            val ois = ObjectInputStream(fis)
-            @Suppress("UNCHECKED_CAST")
-            val loadedTodos = ois.readObject() as MutableMap<Date, MutableList<Todo>>
-            todosByDate.clear()
-            todosByDate.putAll(loadedTodos)
-            ois.close()
-            Log.d("LoadTodos", "todosByDate size after loading: ${todosByDate.size}")
-            Log.d("LoadTodos", "todosByDate after loading: $todosByDate")
-            for ((date, todos) in todosByDate) {
-                Log.d("LoadTodos", "  Date: $date")
-                for (todo in todos) {
-                    Log.d("LoadTodos", "    - ${todo.title}, isChecked: ${todo.isChecked}, deadline: ${todo.deadline}, isImportant: ${todo.isImportant}, isUrgent: ${todo.isUrgent}")
-                }
-            }
-            Log.d("LoadTodos", "loadTodos finished")
-            Log.d("LoadTodos", "--------------------------------------------------")
+            objectInputStream.close()
+            fileInputStream.close()
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    private fun getStartOfDay(date: Date): Date {
+    public fun dayRepeater(originalTodo: Todo) {
+        val originalTitle = originalTodo.title
+        todosByDate.values.flatten()
+            .filter { it.title == originalTitle && it.day }
+            .forEach { cancelTodoNotification(it) }
+
         val calendar = Calendar.getInstance()
-        calendar.time = date
-        calendar.set(Calendar.HOUR_OF_DAY, 0)
-        calendar.set(Calendar.MINUTE, 0)
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
-        return calendar.time
+        calendar.time = originalTodo.date ?: Date()
+        calendar.add(Calendar.DAY_OF_YEAR, 1)
+
+        for (i in 0 until 90) {
+            val newTodo = originalTodo.copy(
+                date = calendar.time,
+                day = true,
+                week = false,
+                month = false,
+                isChecked = false
+            )
+
+            val dateKey = dateFormat.format(calendar.time)
+            val existingTodos = todosByDate.getOrPut(dateKey) { mutableListOf() }
+
+            if (!existingTodos.any { it.title == newTodo.title }) {
+                existingTodos.add(newTodo)
+                originalTodoList.add(newTodo)
+            }
+
+            calendar.add(Calendar.DAY_OF_YEAR, 1)
+        }
+
+        updateTodoListForSelectedDate()
+        saveTodos()
     }
 
-    private fun normalizeDate(date: Date): Date {
+    public fun weekRepeater(originalTodo: Todo) {
+        val originalTitle = originalTodo.title
+        todosByDate.values.flatten()
+            .filter { it.title == originalTitle && it.week }
+            .forEach { cancelTodoNotification(it) }
+
         val calendar = Calendar.getInstance()
-        calendar.time = date
-        calendar.set(Calendar.HOUR_OF_DAY, 0)
-        calendar.set(Calendar.MINUTE, 0)
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
-        return calendar.time
+        calendar.time = originalTodo.date ?: Date()
+
+        val originalDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
+        calendar.add(Calendar.DAY_OF_YEAR, 7)
+
+        for (i in 0 until 12) {
+            val newTodo = originalTodo.copy(
+                date = calendar.time,
+                day = false,
+                week = true,
+                month = false,
+                isChecked = false
+            )
+
+            val dateKey = dateFormat.format(calendar.time)
+            val existingTodos = todosByDate.getOrPut(dateKey) { mutableListOf() }
+
+            if (!existingTodos.any { it.title == newTodo.title && it.week }) {
+                existingTodos.add(newTodo)
+                originalTodoList.add(newTodo)
+            }
+
+            calendar.add(Calendar.DAY_OF_YEAR, 7)
+        }
+
+        updateTodoListForSelectedDate()
+        saveTodos()
     }
 
-    private fun getTodosForDate(date: Date): MutableList<Todo> {
-        val normalizedDate = normalizeDate(date)
-        return todosByDate.getOrDefault(normalizedDate, mutableListOf())
+    fun cancelTodoNotification(todo: Todo) {
+        val notificationId = todo.hashCode()
+        val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
+        val intent = Intent(this, ReminderReceiver::class.java)
+        val pendingIntent = PendingIntent.getBroadcast(
+            this,
+            notificationId,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        alarmManager.cancel(pendingIntent)
     }
 
-    private fun getDayOfWeek(date: Date): Int {
-        val calendar = Calendar.getInstance()
-        calendar.time = date
-        calendar.firstDayOfWeek = Calendar.MONDAY
-        val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
-        Log.d("getDayOfWeek", "getDayOfWeek: ${dayOfWeek.toString()}")
-        return dayOfWeek - calendar.firstDayOfWeek
+    private fun handleTodoUpdate(updatedTodo: Todo) {
+        val dateString = dateFormat.format(updatedTodo.date ?: Date())
+        todosByDate[dateString]?.let { dateTodos ->
+            val index = dateTodos.indexOfFirst {
+                it.title == updatedTodo.title && dateFormat.format(it.date) == dateString
+            }
+            if (index != -1) {
+                dateTodos[index] = updatedTodo.copy()
+                scheduleTodoNotification(updatedTodo)
+                saveTodos()
+
+                originalTodoList.indexOfFirst {
+                    it.title == updatedTodo.title && dateFormat.format(it.date) == dateString
+                }.takeIf { it != -1 }?.let { idx ->
+                    originalTodoList[idx] = updatedTodo.copy()
+                }
+            }
+        }
+    }
+
+    private fun handleTodoDelete(position: Int) {
+        val dateString = dateFormat.format(selectedDate)
+        todosByDate[dateString]?.let { dateTodos ->
+            if (position in 0 until dateTodos.size) {
+                val deletedTodo = dateTodos[position]
+                cancelTodoNotification(deletedTodo)
+
+                dateTodos.removeAt(position)
+                originalTodoList.removeAll {
+                    it.title == deletedTodo.title && dateFormat.format(it.date) == dateString
+                }
+
+                if (dateTodos.isEmpty()) {
+                    todosByDate.remove(dateString)
+                }
+
+                saveTodos()
+                updateTodoListForSelectedDate()
+            }
+        }
+    }
+}
+
+class ReminderReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notificationId = intent.getIntExtra("notification_id", 0)
+        val title = intent.getStringExtra("title") ?: "Task Reminder"
+        val content = intent.getStringExtra("content") ?: "You have a task to complete"
+
+        val builder = NotificationCompat.Builder(context, "todo_reminder_channel")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+
+        notificationManager.notify(notificationId, builder.build())
     }
 }
