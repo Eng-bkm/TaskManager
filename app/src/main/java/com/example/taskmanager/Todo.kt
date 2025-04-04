@@ -8,37 +8,33 @@ import java.util.Locale
 data class Todo(
     var title: String,
     var isChecked: Boolean = false,
-    var from: String? = null,          // Format: "HH:mm" (e.g., "14:30")
-    var to: String? = null,            // Format: "HH:mm" (e.g., "15:30")
+    var from: String? = null,
+    var to: String? = null,
     var isImportant: Boolean = false,
     var isUrgent: Boolean = false,
-    var deadlineDate: String? = null,  // Format: "dd/MM/yyyy" (e.g., "25/12/2023")
-    var deadlineTime: String? = null,  // Format: "HH:mm" (e.g., "23:59")
-    var reminders: MutableList<String> = mutableListOf(), // Not currently used in notification logic
-    var day: Boolean = false,          // For daily repeating tasks
-    var week: Boolean = false,         // For weekly repeating tasks
-    var month: Boolean = false,        // For monthly repeating tasks
-    var date: Date? = null,            // The base date for the task
-    var reminderTimeDate: String? = null, // Format: "dd/MM/yyyy" (specific reminder date)
-    var reminderTimeTime: String? = null  // Format: "HH:mm" (specific reminder time)
+    var deadlineDate: String? = null,
+    var deadlineTime: String? = null,
+    var reminders: MutableList<String> = mutableListOf(),
+    var day: Boolean = false,
+    var week: Boolean = false,
+    var month: Boolean = false,
+    var date: Date? = null,
+    var reminderTimeDate: String? = null,
+    var reminderTimeTime: String? = null
 ) : Serializable {
 
-    // Helper function to check if this todo has a reminder set
     fun hasReminder(): Boolean {
         return !reminderTimeDate.isNullOrEmpty() && !reminderTimeTime.isNullOrEmpty()
     }
 
-    // Helper function to check if this todo has a deadline set
     fun hasDeadline(): Boolean {
         return !deadlineDate.isNullOrEmpty() && !deadlineTime.isNullOrEmpty()
     }
 
-    // Helper function to check if this todo has a time range set
     fun hasTimeRange(): Boolean {
         return !from.isNullOrEmpty() && !to.isNullOrEmpty()
     }
 
-    // Returns a string representation of the reminder time
     fun getReminderTimeString(): String {
         return if (hasReminder()) {
             "$reminderTimeDate $reminderTimeTime"
@@ -49,6 +45,27 @@ data class Todo(
         } else {
             "No reminder set"
         }
+    }
+
+    // Deep copy method
+    fun deepCopy(): Todo {
+        return Todo(
+            title = this.title,
+            isChecked = this.isChecked,
+            from = this.from,
+            to = this.to,
+            isImportant = this.isImportant,
+            isUrgent = this.isUrgent,
+            deadlineDate = this.deadlineDate,
+            deadlineTime = this.deadlineTime,
+            reminders = this.reminders.toMutableList(),
+            day = this.day,
+            week = this.week,
+            month = this.month,
+            date = this.date?.let { Date(it.time) },
+            reminderTimeDate = this.reminderTimeDate,
+            reminderTimeTime = this.reminderTimeTime
+        )
     }
 
     companion object {

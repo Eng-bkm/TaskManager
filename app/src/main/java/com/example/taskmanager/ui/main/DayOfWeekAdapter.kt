@@ -30,16 +30,15 @@ class DayOfWeekAdapter(
 
     override fun onBindViewHolder(holder: DayOfWeekViewHolder, position: Int) {
         val dayOfWeek = daysOfWeek[position]
-        holder.tvDayOfWeek.text = dayOfWeek
-
-        // Highlight the selected day
+        holder.tvDayOfWeek.text = dayOfWeek        // Highlight the selected day
         if (position == selectedDay) {
             holder.tvDayOfWeek.setTextColor(Color.WHITE)
-            holder.itemView.setBackgroundColor(Color.BLUE) // Highlight color
+            holder.itemView.setBackgroundColor(Color.parseColor("#47afca")) // Highlight color
         } else {
             holder.tvDayOfWeek.setTextColor(Color.BLACK)
-            holder.itemView.setBackgroundColor(Color.WHITE) // Default color
+            holder.itemView.setBackgroundColor(Color.parseColor("#d9f7ff")) // Default color
         }
+
 
         // Handle day click
         holder.itemView.setOnClickListener {

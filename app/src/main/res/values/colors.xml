@@ -7,4 +7,8 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="important_default">#B0BEC5</color> <!-- Gray when inactive -->
+    <color name="important_active">#FFD700</color> <!-- Gold when important -->
+    <color name="urgent_default">#B0BEC5</color> <!-- Gray when inactive -->
+    <color name="urgent_active">#FF5252</color> <!-- Red when urgent -->
 </resources>
