@@ -41,11 +41,6 @@ MyTasker cuts through the clutter:
 ![Main Screen](screenshots/everyday.jpg)
 
 
-
-<div style="display: flex; flex-wrap: wrap; gap: 10px;">
-  <img src="screenshots\everyday.jpg" width="30%" alt="Main task list screen">
-</div>
-
 ### Smart Notifications 🔔
 - Reminder alerts
 - Deadline warnings
