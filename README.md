@@ -21,22 +21,19 @@ MyTasker cuts through the clutter:
 ## Key Features ⚡
 
 ### Dead-Simple Workflow
-1. Add task (title only required)
+ **Add task (title only required)**
 
 ![Main Screen](screenshots/adding.jpg)
 
 
-2. Mark important/urgent
-
-![Main Screen](screenshots/important.jpg)
 
 
-3. Filter tasks
+ **Filter tasks**
 
 ![Main Screen](screenshots/filters.jpg)
 
 
-4. daily, weekly, monthly repeated tasks marking
+**daily, weekly, monthly repeated tasks marking**
 
 ![Main Screen](screenshots/everyday.jpg)
 
@@ -89,5 +86,5 @@ This app was created to solve *my specific workflow needs*. The notification log
 
 ---
 
-*"Productivity tools should be invisible - when they demand more attention than your actual work, they've failed."*
+*"if productivity apps demand more attention than your actual work, they've failed."*
 - MyTasker Philosophy
