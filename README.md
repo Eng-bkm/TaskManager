@@ -28,11 +28,6 @@ MyTasker cuts through the clutter:
 
 
 
- **Filter tasks**
-
-![Main Screen](screenshots/filters.jpg)
-
-
 **daily, weekly, monthly repeated tasks marking**
 
 ![Main Screen](screenshots/everyday.jpg)
