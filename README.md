@@ -18,6 +18,7 @@ MyTasker cuts through the clutter:
 ![Main Screen](screenshots/lists.jpg)
 
 
+
 ## Key Features ⚡
 
 ### Dead-Simple Workflow
@@ -65,10 +66,7 @@ MyTasker cuts through the clutter:
 2. Open in Android Studio
 3. Build & run on device/emulator
 
-### Usage Tips
-- Long-press tasks for quick actions
-- Swipe left to delete
-- Blue border = important task
+
 
 ## Why You Might Like This
 ✔️ No feature bloat  
@@ -82,5 +80,9 @@ This app was created to solve *my specific workflow needs*. The notification log
 
 ---
 
-*"if productivity apps demand more attention than your actual work, they've failed."*
+*"If productivity apps demand more attention than your actual work, they've failed."*
 - MyTasker Philosophy
+=======
+
+
+
