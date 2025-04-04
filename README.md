@@ -7,7 +7,7 @@ I created this app for personal use after failing to find a lightweight, non-com
 
 > "Most task management tools miss the core purpose - they end up wasting your time instead of saving it."
 
-![Main Screen](screenshots/everyday.jpg)
+
 
 MyTasker cuts through the clutter:
 - Insert tasks in seconds
