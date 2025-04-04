@@ -84,6 +84,7 @@ MyTasker cuts through the clutter:
 ## Disclaimer
 This app was created to solve *my specific workflow needs*. The notification logic isn't exhaustive, but it works perfectly for how I use it. Feel free to fork and adapt it to your own rhythm!
 
+
 ---
 
 *"if productivity apps demand more attention than your actual work, they've failed."*
