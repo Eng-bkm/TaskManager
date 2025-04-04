@@ -7,7 +7,7 @@ I created this app for personal use after failing to find a lightweight, non-com
 
 > "Most task management tools miss the core purpose - they end up wasting your time instead of saving it."
 
-
+![Main Screen](screenshots/everyday.jpg)
 
 MyTasker cuts through the clutter:
 - Insert tasks in seconds
@@ -15,32 +15,35 @@ MyTasker cuts through the clutter:
 - Edit details later *only if needed*
 - Get intelligent notifications
 
-<div style="display: flex; flex-wrap: wrap; gap: 10px;">
-  <img src="C:\Users\brook\OneDrive\Desktop\screenshots\lists.jpg" width="30%" alt="Main task list screen">
-</div>
+![Main Screen](screenshots/lists.jpg)
+
 
 ## Key Features ⚡
 
 ### Dead-Simple Workflow
 1. Add task (title only required)
 
-<div style="display: flex; flex-wrap: wrap; gap: 10px;">
-  <img src="C:\Users\brook\OneDrive\Desktop\screenshots\adding.jpg" width="30%" alt="Main task list screen">
-</div>
+![Main Screen](screenshots/adding.jpg)
+
 
 2. Mark important/urgent
-<div style="display: flex; flex-wrap: wrap; gap: 10px;">
-  <img src="C:\Users\brook\OneDrive\Desktop\screenshots\important.jpg" width="30%" alt="Main task list screen">
-</div>
+
+![Main Screen](screenshots/important.jpg)
+
 
 3. Filter tasks
-<div style="display: flex; flex-wrap: wrap; gap: 10px;">
-  <img src="C:\Users\brook\OneDrive\Desktop\screenshots\filters.jpg" width="30%" alt="Main task list screen">
-</div>
+
+![Main Screen](screenshots/filters.jpg)
+
 
 4. daily, weekly, monthly repeated tasks marking
+
+![Main Screen](screenshots/everyday.jpg)
+
+
+
 <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-  <img src="C:\Users\brook\OneDrive\Desktop\screenshots\everyday.jpg" width="30%" alt="Main task list screen">
+  <img src="screenshots\everyday.jpg" width="30%" alt="Main task list screen">
 </div>
 
 ### Smart Notifications 🔔
